@@ -1,8 +1,10 @@
 
 import io
 import numpy as np
+from scipy import spatial
 from nltk.tokenize import word_tokenize
 sentences = []
+
 
 
 embeddings_words = {}
@@ -29,7 +31,7 @@ def save_embeddings(source_path, target_path, sen_Token):
                 if word[0] in tokens:
                     t.write(line)
                     break
-                    
+
 def get_sentence_embedding(embeddings, tokens):
     sentence_vector = np.zeros(300, dtype="float32")
     word_count = 0
@@ -42,5 +44,12 @@ def get_sentence_embedding(embeddings, tokens):
         sentence_vector = np.divide(sentence_vector, word_count)
     return sentence_vector
 
-s_vector = get_sentence_embedding(get_word_embeddings('MWE/english_new.txt'),sentence_token[0])
-print(s_vector)
+word_embeddings = get_word_embeddings('MWE/english_new.txt')
+
+s_vector_A = get_sentence_embedding(word_embeddings,sentence_token[0])
+s_vector_B = get_sentence_embedding(word_embeddings,sentence_token[1])
+
+result = 1 - spatial.distance.cosine(s_vector_A, s_vector_B)
+print(sentence_token[0])
+print(sentence_token[1])
+print(result)
