@@ -12,20 +12,14 @@ with open('STS2017.eval.v1.1/STS.input.track4a.es-en.txt') as f, open('STS2017.g
         sentences.append((sentence_en,sentence_es, gold_value))
 
 sentence_token = [word_tokenize(sentence[0]) for sentence in sentences]
-# with open('/Users/renelehmann/Documents/Semantic-Textual-Similarity/MWE/english.txt') as f:
-#     for line in f:
-#         line = line.split()
-#         for tokens in sentence_token:
-#             if line[0] in tokens:
-#                 embeddings_words[line[0]] = line[1:]
-#                 print(line[0])
-#                 break
 
-def write_to_file(path, embeddings):
-    with open(path,'w') as f:
-        for embedding in embeddings:
-            f.write(embedding)
-    return True
+def get_word_embeddings(path):
+    temp_embeddings={}
+    with open(path) as f:
+        for line in f:
+            line = line.split()
+            temp_embeddings[line[0]] = np.asarray(line[1:], dtype=np.float32)
+    return temp_embeddings
 
 def save_embeddings(source_path, target_path, sen_Token):
     with open(source_path) as s, open(target_path,'w') as t:
@@ -35,23 +29,18 @@ def save_embeddings(source_path, target_path, sen_Token):
                 if word[0] in tokens:
                     t.write(line)
                     break
+                    
+def get_sentence_embedding(embeddings, tokens):
+    sentence_vector = np.zeros(300, dtype="float32")
+    word_count = 0
+    for word in embeddings:
+        if word in tokens:
+            word_count+=1
+            sentence_vector = np.add(sentence_vector, embeddings[word])
+        
+    if word_count>0:
+        sentence_vector = np.divide(sentence_vector, word_count)
+    return sentence_vector
 
-save_embeddings(
-'/Users/renelehmann/Documents/Semantic-Textual-Similarity/MWE/english.txt',
-'/Users/renelehmann/Documents/Semantic-Textual-Similarity/MWE/english_new.txt',
-sentence_token)
-
-
-def avg_sentence_vector(words, model, num_features, index2word_set):
-    #function to average all words vectors in a given paragraph
-    featureVec = np.zeros((num_features,), dtype="float32")
-    nwords = 0
-
-    for word in words:
-        if word in index2word_set:
-            nwords = nwords+1
-            featureVec = np.add(featureVec, model[word])
-
-    if nwords>0:
-        featureVec = np.divide(featureVec, nwords)
-    return featureVec
+s_vector = get_sentence_embedding(get_word_embeddings('MWE/english_new.txt'),sentence_token[0])
+print(s_vector)
