@@ -17,14 +17,32 @@ def save_relevant_embeddings(source_path, target_path, sen_Token):
                     t.write(line)
                     break
 
-def get_sentence_embedding(embeddings, tokens):
-    sentence_vector = np.zeros(300, dtype="float32")
+def sentence_embedding_avg(word_embeddings, tokens,dimension):
+    sentence_vector = np.zeros(dimension, dtype="float32")
     word_count = 0
-    for word in embeddings:
+    for word in word_embeddings:
         if word in tokens:
             word_count+=1
-            sentence_vector = np.add(sentence_vector, embeddings[word])
+            sentence_vector = np.add(sentence_vector, word_embeddings[word])
         
     if word_count>0:
         sentence_vector = np.divide(sentence_vector, word_count)
     return sentence_vector
+
+def sentence_embedding_min(word_embeddings, tokens):
+    temp_word_embeddings= []
+    for word in word_embeddings:
+        if word in tokens:
+            temp_word_embeddings.append(word_embeddings[word])
+    for embedding in temp_word_embeddings:
+        print(embedding)
+    return np.asarray(temp_word_embeddings).min(0)
+
+def sentence_embedding_max(word_embeddings, tokens):
+    temp_word_embeddings= []
+    for word in word_embeddings:
+        if word in tokens:
+            temp_word_embeddings.append(word_embeddings[word])
+    for embedding in temp_word_embeddings:
+        print(embedding)
+    return np.asarray(temp_word_embeddings).max(0)

@@ -18,8 +18,8 @@ sentence_token = [word_tokenize(sentence[0]) for sentence in sentences]
 
 word_embeddings = emb.get_word_embeddings('MWE/english_new.txt')
 
-s_vector_A = emb.get_sentence_embedding(word_embeddings,sentence_token[0])
-s_vector_B = emb.get_sentence_embedding(word_embeddings,sentence_token[1])
+s_vector_A = emb.sentence_embedding_avg(word_embeddings,sentence_token[0],300)
+s_vector_B = emb.sentence_embedding_min(word_embeddings,sentence_token[1])
 
 result = 1 - spatial.distance.cosine(s_vector_A, s_vector_B)
 print(sentence_token[0])
