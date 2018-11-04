@@ -5,7 +5,11 @@ def get_word_embeddings(path):
     with open(path) as f:
         for line in f:
             line = line.split()
-            temp_embeddings[line[0]] = np.asarray(line[1:], dtype=np.float32)
+            try:
+                temp_embeddings[line[0]] = np.asarray(line[1:], dtype=np.float32)
+            except ValueError:
+                word = line[0]+ ' ' + line[1]
+                temp_embeddings[word] = np.asarray(line[2:], dtype=np.float32)
     return temp_embeddings
 
 def save_relevant_embeddings(source_path, target_path, sen_Token):
@@ -34,8 +38,6 @@ def sentence_embedding_min(word_embeddings, tokens):
     for word in word_embeddings:
         if word in tokens:
             temp_word_embeddings.append(word_embeddings[word])
-    for embedding in temp_word_embeddings:
-        print(embedding)
     return np.asarray(temp_word_embeddings).min(0)
 
 def sentence_embedding_max(word_embeddings, tokens):
@@ -43,6 +45,4 @@ def sentence_embedding_max(word_embeddings, tokens):
     for word in word_embeddings:
         if word in tokens:
             temp_word_embeddings.append(word_embeddings[word])
-    for embedding in temp_word_embeddings:
-        print(embedding)
     return np.asarray(temp_word_embeddings).max(0)
