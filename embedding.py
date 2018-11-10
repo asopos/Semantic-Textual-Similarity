@@ -1,4 +1,5 @@
 import numpy as np
+from nltk.tag import pos_tag
 
 def get_word_embeddings(path):
     temp_embeddings={}
@@ -8,7 +9,6 @@ def get_word_embeddings(path):
             try:
                 temp_embeddings[line[0]] = np.asarray(line[1:], dtype=np.float32)
             except ValueError:
-                # word = line[0]+ ' ' + line[1]
                 temp_embeddings[line[1]] = np.asarray(line[2:], dtype=np.float32)
     return temp_embeddings
 
@@ -28,12 +28,17 @@ def sentence_embedding_avg(word_embeddings, tokens,dimension):
         if word in tokens:
             emb_count+=1
             sentence_vector = np.add(sentence_vector, word_embeddings[word])
-        else:
-            print(word)
     if emb_count>0:
         sentence_vector = np.divide(sentence_vector, emb_count)
     emb_avrg=emb_count/len(tokens)
     return sentence_vector, emb_avrg
+
+def sentence_embedding_POS(word_embeddings, tokens, dimension):
+    sentence_vector = np.zeros(dimension, dtype="float32")
+    for token in tokens:
+        if token in word_embeddings:
+            sentence_vector = np.add(sentence_vector, word_embeddings[token])
+    return None
 
 def sentence_embedding_min(word_embeddings, tokens):
     temp_word_embeddings= []
