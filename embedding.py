@@ -13,7 +13,7 @@ def get_word_embeddings(path):
     return temp_embeddings
 
 def save_relevant_embeddings(source_path, target_path, sen_Token):
-    with open(source_path) as s, open(target_path,'w') as t:
+    with open(source_path, encoding='utf-8') as s, open(target_path,'w', encoding='utf-8') as t:
         for line in s:
             word = line.split()
             for tokens in sen_Token:
