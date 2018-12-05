@@ -1,6 +1,10 @@
 import csv
 import numpy as np
-from scipy import spatial
+from scipy.stats import pearsonr
+from gensim import matutils
+import math
+import string
+from nltk.stem import SnowballStemmer
 from gensim.models import KeyedVectors
 from nltk.tokenize import word_tokenize
 from nltk.corpus import wordnet, stopwords
@@ -8,35 +12,20 @@ import pandas as pd
 import embedding as emb
 import evaluation as ev
 import warnings
+
 warnings.filterwarnings("ignore")
 sentences = []
 
+stemmer = SnowballStemmer("english")
+punctation = list(string.punctuation)
+stopWords = set(stopwords.words('english'))
 
-def get_word_embeddings(path):
-    temp_embeddings={}
-    with open(path, encoding='utf-8') as f:
-        for line in f:
-            line = line.split()
-            if len(line)>2:
-                temp_embeddings[line[0]] = np.asarray(line[1:], dtype=np.float32)
-    return temp_embeddings
 
-#word_embed= get_word_embeddings('Word Embeddings\GoogleNews-vectors-negative300.txt')
-word_embed={'hallo':2, 'A':3}
-def get_word_embeddings_for_sentence(target_path, sentence, emb):
-    count=0
-    with open(target_path,'w',encoding='utf-8') as f:
-        word_list=[]
-        for word in sentence:
-            if word not in word_list:
-                try: 
-                    f.write(word + ' ' + emb[word] + '\n')
-                except KeyError:
-                    count+=1
-    print(count)
+google_wv = emb.get_word_embeddings('Word Embeddings\\dev_data_embeddings.txt')
+#google_wv = emb.get_word_embeddings('Word Embeddings\\GoogleNews-vectors-negative300.txt')
 
 dev_data =pd.read_csv(
-    filepath_or_buffer='stsbenchmark\sts-dev.csv',
+    filepath_or_buffer='stsbenchmark\\sts-dev.csv',
 #    filepath_or_buffer='./test.csv',
     quoting=csv.QUOTE_NONE,
     sep='\t',
@@ -46,42 +35,67 @@ dev_data =pd.read_csv(
     )
 dev_data.columns = ['gold_value','sentence_1','sentence_2']
 
-dev_data['sentence_1']=dev_data.apply(lambda row: word_tokenize(row['sentence_1'],'english'), axis=1)
-dev_data.apply(lambda row: get_word_embeddings_for_sentence('C:\\Users\\Rene\\Documents\\Semantic Textual Similarity\\Word Embeddings\\new_embddings.txt',row['sentence_1'],word_embed), axis=1)
-dev_data['sentence_2']=dev_data.apply(lambda row: word_tokenize(row['sentence_2'],'english'), axis=1)
+def preprocess_pipeline(sentence):
+    word_token = [word.lower() for word in word_tokenize(sentence) if word.lower() not in stopWords]
+    return word_token
 
-print(dev_data.tail())
+print(dev_data.head())
+dev_data['sentence_1']=dev_data.apply(lambda row: preprocess_pipeline(row['sentence_1']), axis=1)
+dev_data['sentence_2']=dev_data.apply(lambda row: preprocess_pipeline(row['sentence_2']), axis=1)
 
 
-google_wv = KeyedVectors.load_word2vec_format('C:\\Users\\Rene\\Documents\\Semantic Textual Similarity\\Word Embeddings\\GoogleNews-vectors-negative300.txt', binary=False, limit=1000)
 
-#sentence_1 = ['hello', 'my', 'name', 'is', 'obama']
-#sentence_2 = ['hello', 'obama', 'my','name', 'is', 'power']
-#print(google_wv.n_similarity(sentence_1, sentence_2))
-embeddings_words = {}
+def sentence_similarity(emb,sentence_1,sentence_2):
+    missing_token=[]
+    v1 = []
+    v2 = []
+    for word in sentence_1:
+        try:
+            v1.append(emb[word.lower()])
+        except KeyError:
+            if word.lower() not in missing_token:
+                missing_token.append(word.lower())
 
-def sentence_similarity(emb, sentence_1,sentence_2):
-    try:
-        return emb.n_similarity(sentence_1,sentence_2)
-    except KeyError as error:
-        print(error)
-        return 0
+    for word in sentence_2:
+        try:
+            v2.append(emb[word.lower()])
+        except KeyError:
+            if word.lower() not in missing_token:
+                missing_token.append(word.lower())
+    print(missing_token)
+    return np.dot(matutils.unitvec(np.array(v1).mean(axis=0), norm='l2'), matutils.unitvec(np.array(v2).mean(axis=0), norm='l2'))
+
+def corpus_similarity(emb, sentences_1, sentences_2, gold_values, target_path):
+    missing_token=[]
+    pred_values=[]
+    for sentence_1, sentence_2 in zip(sentences_1,sentences_2):
+        v1=[]
+        v2=[]
+        for word in sentence_1:
+            try:
+                v1.append(emb[word.lower()])
+            except KeyError:
+                if word.lower() not in missing_token:
+                    missing_token.append(word.lower())
+        for word in sentence_2:
+            try:
+                v2.append(emb[word.lower()])
+            except KeyError:
+                if word.lower() not in missing_token:
+                    missing_token.append(word.lower())
+        pred_values.append(np.dot(matutils.unitvec(np.array(v1).mean(axis=0), norm='l2'), matutils.unitvec(np.array(v2).mean(axis=0), norm='l2')))
+    with open(target_path,'w',encoding='utf-8') as f:
+        for token in missing_token:
+            f.write(str(token) + '\n')
+    return pearsonr(pred_values, gold_values)
+
+p_correlation, p_value = corpus_similarity(google_wv, dev_data['sentence_1'].tolist(), dev_data['sentence_2'].tolist(), dev_data['gold_value'].tolist(), 'missing_token.txt')
+print(p_correlation*100)
+
+
     
 
-dev_data['pred_value']=dev_data.apply(lambda row: sentence_similarity(google_wv,row['sentence_1'],row['sentence_2']), axis=1)
+#dev_data['pred_value']=dev_data.apply(lambda row: sentence_similarity(google_wv,row['sentence_1'],row['sentence_2']), axis=1)
 
-print(dev_data.tail())
-
-#sentence_en_token = [word_tokenize(sentence[0], 'english') for sentence in sentences]
-#sentence_es_token = [word_tokenize(sentence[1], 'spanish') for sentence in sentences]
-
-
-# with open('predict.txt','w') as p:
-#     for en, es in zip(sentence_en_token, sentence_es_token):
-#         s_vector_en, avr_vec_found_en = emb.sentence_embedding_avg(word_en_embeddings, en ,300)
-#         s_vector_es, avr_vec_found_es = emb.sentence_embedding_avg(word_es_embeddings, es , 300)
-#         result = 1 - spatial.distance.cosine(s_vector_en, s_vector_es)
-#         p.write(str(round(result*5,1))+ '\t'+ str(avr_vec_found_en) + '\t'+ str(avr_vec_found_es) + '\n')
-#         print(en, ' ' , es , ': ' ,result)
-
-#print(ev.evaluationB('predict.txt','STS2017.gs/STS.gs.track4a.es-en.txt'))
+#p_correlation, p_value = pearsonr(dev_data['pred_value'].tolist(), dev_data['gold_value'].tolist())
+print(dev_data.head())
