@@ -30,3 +30,4 @@ def evaluationB(predicted_path, gold_path):
         avr_wrong= wrong_pred/count
     return avr_correct,avr_nearly_correct,avr_meh_correct,avr_wrong
 
+test=[]
