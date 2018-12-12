@@ -6,9 +6,10 @@ import math
 import string
 from nltk.stem import SnowballStemmer
 from gensim.models import KeyedVectors
-from gensim.models import fasttext
+from gensim.models import FastText
 from nltk.tokenize import word_tokenize
 from nltk.corpus import wordnet, stopwords
+from nltk import pos_tag
 import pandas as pd
 import embedding as emb
 import evaluation as ev
@@ -22,10 +23,11 @@ stemmer = SnowballStemmer("english")
 punctation = list(string.punctuation)
 stopWords = set(stopwords.words('english'))
 
+fastText_emb = FastText.load_fasttext_format('Word Embeddings\\wiki.en.bin', 'utf-8')
 
-#google_wv = emb.get_word_embeddings('Word Embeddings\\dev_embeddings_googleNews_word2vec')
+#google_wv = emb.get_word_embeddings('Word Embeddings\\dev_embeddings_googleNews_word2vec.txt')
 #google_wv_g = emb.get_word_embeddings('Word Embeddings\\GoogleNews-vectors-negative300.txt')
-glove_wv = emb.get_word_embeddings('Word Embeddings\\dev_embeddings_wiki_glove.txt')
+#glove_wv = emb.get_word_embeddings('Word Embeddings\\dev_embeddings_wiki_glove.txt')
 
 dev_data =pd.read_csv(
     filepath_or_buffer='stsbenchmark\\sts-dev.csv',
@@ -40,27 +42,14 @@ dev_data.columns = ['gold_value','sentence_1','sentence_2']
 
 def preprocess_pipeline(sentence):
     word_token = [word.lower() for word in word_tokenize(sentence) if word.lower() not in stopWords]
+    #if word.lower() not in stopWords
     word_token = [word for word in word_token if word not in punctation]
     return word_token
 
-dev_data['sentence_1']=dev_data.apply(lambda row: preprocess_pipeline(row['sentence_1']), axis=1)
-dev_data['sentence_2']=dev_data.apply(lambda row: preprocess_pipeline(row['sentence_2']), axis=1)
+dev_data[['sentence_1', 'sentence_2']]=dev_data.apply(
+    lambda row: pd.Series([preprocess_pipeline(row['sentence_1']),preprocess_pipeline(row['sentence_2'])]), axis=1)
 
 print(dev_data.tail())
-
-def sentence_coverage(word_tokens, emb):
-    count=0
-    for token in word_tokens:
-        if token in emb:
-            count+=1
-    return count/len(word_tokens)
-
-def sentences_cov(word_token_1, word_token_2, emb):
-    cov_1=sentence_coverage(word_token_1,emb)
-    cov_2=sentence_coverage(word_token_2,emb)
-    return (cov_1+cov_2)/2
-
-
 
 def sentence_similarity(emb,sentence_1,sentence_2):
     missing_token=[]
@@ -115,23 +104,30 @@ def mod_sentence_similarity(emb,sentence_1,sentence_2, seperate):
         similiarity_score =0
     return similiarity_score, len(v1)/len(sentence_1), len(v2)/len(sentence_2)
 
-def emb_vector_collection(sentence, emb):
+def emb_vector_collection(sentence, emb, pos_filter=None):
+    count_pos=0
     sentence_vec=[]
     missing_token=[]
-    for word in sentence:
+    pos_tags = pos_tag(sentence)
+    for word, pos in pos_tags:
         try:
-            sentence_vec.append(emb[word.lower()])
+            if pos_filter == None:
+                sentence_vec.append(emb[word.lower()])
+            if pos_filter != None and pos != pos_filter:
+                sentence_vec.append(emb[word.lower()])
+            if pos == pos_filter:
+                count_pos+=1
         except KeyError:
             missing_token.append(word.lower())
-    return sentence_vec
+    return count_pos,sentence_vec, missing_token
 
 
-def rnd_sentence_similarity(emb,sentence_1,sentence_2, size):
-    v2 = emb_vector_collection(sentence_2, emb)
-    v1 = emb_vector_collection(sentence_1, emb)
+def rnd_sentence_similarity(emb,sentence_1,sentence_2, percent, pos_filter=None):
+    count_filter_pos_s1, v2, miss_s2 = emb_vector_collection(sentence_2, emb, pos_filter)
+    count_filter_pos_s2, v1, miss_s1 = emb_vector_collection(sentence_1, emb, pos_filter)
     
-    size_1= math.ceil(size*len(sentence_1))
-    size_2= math.ceil(size*len(sentence_2))
+    size_1= math.ceil(percent*len(sentence_1))
+    size_2= math.ceil(percent*len(sentence_2))
     if len(v1) >= size_1:
         v_1 = random.sample(v1, size_1)
     else:
@@ -144,8 +140,10 @@ def rnd_sentence_similarity(emb,sentence_1,sentence_2, size):
         similiarity_score = np.dot(matutils.unitvec(np.array(v_1).mean(axis=0), norm='l2'), matutils.unitvec(np.array(v_2).mean(axis=0), norm='l2'))
     except TypeError:
         similiarity_score =0
-    return similiarity_score, len(v_1)/len(sentence_1), len(v_2)/len(sentence_2)
-
+    if(pos_filter != None):
+        return similiarity_score, len(v_1)/len(sentence_1), len(v_2)/len(sentence_2), count_filter_pos_s1/len(sentence_1), count_filter_pos_s2/len(sentence_2)
+    else:
+        return similiarity_score, len(v_1)/len(sentence_1), len(v_2)/len(sentence_2)
 def corpus_similarity(emb, sentences_1, sentences_2, gold_values, target_path):
     missing_token=[]
     pred_values=[]
@@ -172,50 +170,96 @@ def corpus_similarity(emb, sentences_1, sentences_2, gold_values, target_path):
 
 #p_correlation, p_value = corpus_similarity(google_wv_g, dev_data['sentence_1'].tolist(), dev_data['sentence_2'].tolist(), dev_data['gold_value'].tolist(), 'missing_token.txt')
     
+def fastText_sentence_similarity(fastTextemb,sentence_1, sentence_2):
+    return fastTextemb.wv.n_similarity(sentence_1,sentence_2)
 
-dev_data[['pred_value', 'cov_avrg_s1', 'cov_avrg_s2']]=dev_data.apply(
-    lambda row: pd.Series(rnd_sentence_similarity(glove_wv,row['sentence_1'],row['sentence_2'], 1)), axis=1)
+pos_list=['CC', 'CD','DT', 'EX','FW','IN','JJ', 'JJR','JJS','LS','MD','NN','NNS','NNP','NNPS','PDT','POS','PRP','PRP$','RB','RBR','RBS','RP','TO','UH','VB','VBD','VBG','VBN','VBP','VBZ','WDT','WP','WP$','WRB']
+for pos in pos_list:
+    dev_data[['pred_value', 'cov_avrg_s1', 'cov_avrg_s2', 'pos_cov_avr_s1', 'pos_cov_avr_s2']]=dev_data.apply(
+        lambda row: pd.Series(rnd_sentence_similarity(fastText_emb,row['sentence_1'],row['sentence_2'], 1, pos)), axis=1)
+    p_correlation, p_value = pearsonr(dev_data['pred_value'].tolist(), dev_data['gold_value'].tolist())
+    avrg_cov_s1 = sum(dev_data['cov_avrg_s1'].tolist())/len(dev_data['cov_avrg_s1'].tolist())
+    avrg_cov_s2 = sum(dev_data['cov_avrg_s2'].tolist())/len(dev_data['cov_avrg_s2'].tolist())
 
+    avrg_pos_cov_s1 = sum(dev_data['pos_cov_avr_s1'].tolist())/len(dev_data['pos_cov_avr_s1'].tolist())
+    avrg_pos_cov_s2 = sum(dev_data['pos_cov_avr_s2'].tolist())/len(dev_data['pos_cov_avr_s2'].tolist())
+    print(pos+' --------------------' )
+    print('Pearson - Correlation: '+ str(p_correlation*100))
+    print('Avr_Coverage: '+str((avrg_cov_s1 + avrg_cov_s2)/2))
+    print('POS_Coverage: ' + str((avrg_pos_cov_s1 + avrg_pos_cov_s2)/2))
 
+#dev_data['pred_value']=dev_data.apply(
+#     lambda row: fastText_sentence_similarity(fastText_emb,row['sentence_1'],row['sentence_2']), axis=1)
 
 #dev_data['cov_avrg']=dev_data.apply(lambda row: sentences_cov(row['sentence_1'],row['sentence_2'], google_wv), axis=1)
 
 p_correlation, p_value = pearsonr(dev_data['pred_value'].tolist(), dev_data['gold_value'].tolist())
-#print(dev_data.tail())
-#print(p_correlation)
+# print(dev_data.head())
+# print(p_correlation)
 avrg_cov_s1 = sum(dev_data['cov_avrg_s1'].tolist())/len(dev_data['cov_avrg_s1'].tolist())
 avrg_cov_s2 = sum(dev_data['cov_avrg_s2'].tolist())/len(dev_data['cov_avrg_s2'].tolist())
 
-#print((avrg_cov_s1 + avrg_cov_s2)/2)
-test=0.1
-min=0
-max=0
-i=0
-while test < 1.1:
-    result_list=[]
-    i=0
-    while i<1001:
-        dev_data[['pred_value', 'cov_avrg_s1', 'cov_avrg_s2']]=dev_data.apply(
-        lambda row: pd.Series(rnd_sentence_similarity(glove_wv,row['sentence_1'],row['sentence_2'], test)), axis=1)
-        
-        p_correlation, p_value = pearsonr(dev_data['pred_value'].tolist(), dev_data['gold_value'].tolist())
-        if i ==0:
-            min = p_correlation
-            max = p_correlation
-        if p_correlation < min:
-            min = p_correlation
-        if p_correlation > max:
-            max = p_correlation
-        result_list.append(p_correlation)
-    #    print(str(i)+ '- ' + str(p_correlation)+" - min: "+ str(min) + ' max: '+ str(max) )
-        i+=1
+avrg_pos_cov_s1 = sum(dev_data['pos_cov_avr_s1'].tolist())/len(dev_data['pos_cov_avr_s1'].tolist())
+avrg_pos_cov_s2 = sum(dev_data['pos_cov_avr_s2'].tolist())/len(dev_data['pos_cov_avr_s2'].tolist())
+
+# print((avrg_cov_s1 + avrg_cov_s2)/2)
+# print((avrg_pos_cov_s1 + avrg_pos_cov_s2)/2)
+
+
+def evaluate_rnd_coverage_emb(emb, data_frame, iterations):
+    percent=0.1
+    while percent <1.1:
+        result_list=[]
+        i=0
+        percent=0.1
+        while i < iterations:
+            data_frame[['pred_value', 'cov_avrg_s1', 'cov_avrg_s2']]=data_frame.apply(
+                lambda row: pd.Series(rnd_sentence_similarity(emb,row['sentence_1'],row['sentence_2'], percent)), axis=1)
+            p_correlation, p_value = pearsonr(dev_data['pred_value'].tolist(), dev_data['gold_value'].tolist())
+            if i ==0:
+                min = p_correlation
+                max = p_correlation
+            if p_correlation < min:
+                min = p_correlation
+            if p_correlation > max:
+                max = p_correlation
+            result_list.append(p_correlation)
+            i+=1
     avrg_cov_s1 = sum(dev_data['cov_avrg_s1'].tolist())/len(dev_data['cov_avrg_s1'].tolist())
     avrg_cov_s2 = sum(dev_data['cov_avrg_s2'].tolist())/len(dev_data['cov_avrg_s2'].tolist())
-    print('--------------- ' + str(test))
+    print('--------------- ' + str(percent))
     print('Min: '+str(min*100), 'Max: '+ str(max*100))
     print('Avrg: '+ str(np.mean(result_list)*100))
     print('Avr_Coverage: '+ str((avrg_cov_s1 + avrg_cov_s2)/2))
-    test = test + 0.1
+    percent = percent + 0.1 
+    return None
+
+
+# while test < 1.1:
+#     result_list=[]
+#     i=0
+#     while i<1001:
+#         dev_data[['pred_value', 'cov_avrg_s1', 'cov_avrg_s2']]=dev_data.apply(
+#         lambda row: pd.Series(rnd_sentence_similarity(glove_wv,row['sentence_1'],row['sentence_2'], test)), axis=1)
+        
+#         p_correlation, p_value = pearsonr(dev_data['pred_value'].tolist(), dev_data['gold_value'].tolist())
+#         if i ==0:
+#             min = p_correlation
+#             max = p_correlation
+#         if p_correlation < min:
+#             min = p_correlation
+#         if p_correlation > max:
+#             max = p_correlation
+#         result_list.append(p_correlation)
+#     #    print(str(i)+ '- ' + str(p_correlation)+" - min: "+ str(min) + ' max: '+ str(max) )
+#         i+=1
+#     avrg_cov_s1 = sum(dev_data['cov_avrg_s1'].tolist())/len(dev_data['cov_avrg_s1'].tolist())
+#     avrg_cov_s2 = sum(dev_data['cov_avrg_s2'].tolist())/len(dev_data['cov_avrg_s2'].tolist())
+#     print('--------------- ' + str(test))
+#     print('Min: '+str(min*100), 'Max: '+ str(max*100))
+#     print('Avrg: '+ str(np.mean(result_list)*100))
+#     print('Avr_Coverage: '+ str((avrg_cov_s1 + avrg_cov_s2)/2))
+#     test = test + 0.1
 
 #print(min, max)
 #print(np.mean(result_list))
