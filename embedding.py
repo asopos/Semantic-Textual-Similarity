@@ -8,8 +8,10 @@ def get_word_embeddings(path):
         for line in f:
             line = line.split()
             if len(line)>2:
-                temp_embeddings[line[0].lower()] = np.asarray(line[1:], dtype=np.float32)
+                temp_embeddings[line[0]] = np.asarray(line[1:], dtype=np.float32)
     return temp_embeddings
+
+
 
 def save_relevant_embeddings(source_path, target_path, sen_Token):
     word_list=[]
