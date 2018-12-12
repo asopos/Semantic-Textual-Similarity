@@ -1,23 +1,9 @@
-relevant_missing_words = []
-google_missing_words =[]
+from gensim.models import FastText
 
-diffrences=[]
+fastText_emb = FastText.load_fasttext_format('Word Embeddings\\fastText_Skipgram_WIki.bin', 'utf-8')
 
-with open('missing_token.txt', encoding='utf-8') as s:
-    for line in s:
-        relevant_missing_words.append(str(line))
+sent_1 =['Hello','i','AM','obama']
 
-with open('missing_token_all_G.txt', encoding='utf-8') as s:
-    for line in s:
-        google_missing_words.append(str(line))
+sent_2 = ['I','am', 'the', 'President', 'of', 'the', 'usa']
 
-for word in relevant_missing_words:
-    if word not in google_missing_words:
-        diffrences.append(word)
-
-
-print(len(diffrences))
-print(diffrences)
-
-
-print(len(relevant_missing_words),len(google_missing_words))
+print(fastText_emb['o'])
