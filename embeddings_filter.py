@@ -20,26 +20,29 @@ def get_word_embeddings(path):
         for line in f:
             line = line.split()
             if len(line)>2:
-                temp_embeddings[line[0]] = np.asarray(line[1:], dtype=np.float32)
+                try:
+                    temp_embeddings[line[0]] = np.asarray(line[1:], dtype=np.float32)
+                except ValueError:
+                    print(line[0])
     return temp_embeddings
 
 
 
 sentences = dev_data['sentence_1'].tolist() + dev_data['sentence_2'].tolist()
 
-def save_relevant_embeddings(source_path, target_path, sen_Token):
+def save_relevant_embeddings(src_emb, target_path, sen_Token):
     word_list=[]
     count=0
     for sentence in sen_Token:
         for word in sentence:
+            word = word.lower()
             if word not in word_list:
                 word_list.append(word)
-    with open(source_path, encoding='utf-8') as s, open(target_path,'w',encoding='utf-8') as f:
-        for line in s:
-            sline = line.split()
-            if sline[0] in word_list:
-                f.write(line)
-            else:
+    with open(target_path,'w',encoding='utf-8') as f:
+        for word in word_list:
+            try:
+                f.write(str(word)+ ' '+" ".join(map(str, src_emb[word])) + "\n")
+            except KeyError:
                 count+=1
     print(count)
 
@@ -58,18 +61,22 @@ def sentences_to_words(sentence_list):
             word_list.append(word)
     return word_list
 
-dev_emb = get_word_embeddings('Word Embeddings\\dev_data_embeddings.txt')
-google_emb = get_word_embeddings('Word Embeddings\\GoogleNews-vectors-negative300.txt')
+#dev_emb = get_word_embeddings('Word Embeddings\\GoogleNews-vectors-fast-test.txt')
+#google_emb = get_word_embeddings('Word Embeddings\\GoogleNews-vectors-negative300.txt')
+
+glove_emb = get_word_embeddings('Word Embeddings\\glove.txt')
 
 def test_embeddings(emb, sentences):
     words_without_embbedings=[]
     word_list=sentences_to_words(sentences)
     for word in word_list:
         try:
-            a=emb[word]
+            a=emb[word.lower()]
         except KeyError:
             words_without_embbedings.append(word)
     return words_without_embbedings
 
 
-print(len(test_embeddings(dev_emb,sentences)),len(test_embeddings(google_emb,sentences)))
+#print(len(test_embeddings(dev_emb,sentences)),len(test_embeddings(google_emb,sentences)))
+
+save_relevant_embeddings(glove_emb, 'Word Embeddings\\dev_embeddings_wiki_glove.txt', sentences)
