@@ -23,8 +23,9 @@ stemmer = SnowballStemmer("english")
 punctation = list(string.punctuation)
 stopWords = set(stopwords.words('english'))
 
-fastText_emb = FastText.load_fasttext_format('Word Embeddings\\wiki.en.bin', 'utf-8')
+#fastText_emb = FastText.load_fasttext_format('Word Embeddings\\wiki.en.bin', 'utf-8')
 
+fastText_emb = emb.get_word_embeddings('Word Embeddings\\dev_embeddings_wiki_fasttext.txt')
 #google_wv = emb.get_word_embeddings('Word Embeddings\\dev_embeddings_googleNews_word2vec.txt')
 #google_wv_g = emb.get_word_embeddings('Word Embeddings\\GoogleNews-vectors-negative300.txt')
 #glove_wv = emb.get_word_embeddings('Word Embeddings\\dev_embeddings_wiki_glove.txt')
@@ -174,7 +175,12 @@ def fastText_sentence_similarity(fastTextemb,sentence_1, sentence_2):
     return fastTextemb.wv.n_similarity(sentence_1,sentence_2)
 
 pos_list=['CC', 'CD','DT', 'EX','FW','IN','JJ', 'JJR','JJS','LS','MD','NN','NNS','NNP','NNPS','PDT','POS','PRP','PRP$','RB','RBR','RBS','RP','TO','UH','VB','VBD','VBG','VBN','VBP','VBZ','WDT','WP','WP$','WRB']
-for pos in pos_list:
+noun_list=['NN','NNS','NNP','NNPS']
+verb_list=['VB','VBD','VBG','VBN','VBP','VBZ']
+adj_list=['JJ', 'JJR','JJS']
+
+
+for pos in verb_list:
     dev_data[['pred_value', 'cov_avrg_s1', 'cov_avrg_s2', 'pos_cov_avr_s1', 'pos_cov_avr_s2']]=dev_data.apply(
         lambda row: pd.Series(rnd_sentence_similarity(fastText_emb,row['sentence_1'],row['sentence_2'], 1, pos)), axis=1)
     p_correlation, p_value = pearsonr(dev_data['pred_value'].tolist(), dev_data['gold_value'].tolist())
