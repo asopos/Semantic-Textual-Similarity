@@ -2,6 +2,7 @@ import csv
 import pandas as pd
 import numpy as np
 from nltk.tokenize import word_tokenize
+from gensim.models import FastText
 dev_data =pd.read_csv(
     filepath_or_buffer='stsbenchmark\\sts-dev.csv',
     quoting=csv.QUOTE_NONE,
@@ -63,8 +64,8 @@ def sentences_to_words(sentence_list):
 
 #dev_emb = get_word_embeddings('Word Embeddings\\GoogleNews-vectors-fast-test.txt')
 #google_emb = get_word_embeddings('Word Embeddings\\GoogleNews-vectors-negative300.txt')
-
-glove_emb = get_word_embeddings('Word Embeddings\\glove.txt')
+fastText_emb = FastText.load_fasttext_format('Word Embeddings\\wiki.en.bin', 'utf-8')
+#glove_emb = get_word_embeddings('Word Embeddings\\glove.txt')
 
 def test_embeddings(emb, sentences):
     words_without_embbedings=[]
@@ -79,4 +80,4 @@ def test_embeddings(emb, sentences):
 
 #print(len(test_embeddings(dev_emb,sentences)),len(test_embeddings(google_emb,sentences)))
 
-save_relevant_embeddings(glove_emb, 'Word Embeddings\\dev_embeddings_wiki_glove.txt', sentences)
+save_relevant_embeddings(fastText_emb, 'Word Embeddings\\dev_embeddings_wiki_fasttext.txt', sentences)
