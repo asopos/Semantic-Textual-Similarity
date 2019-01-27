@@ -1,6 +1,6 @@
 import csv
 import numpy as np
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, spearmanr
 from gensim import matutils
 import math
 import string
@@ -13,7 +13,7 @@ from nltk import pos_tag, pos_tag_sents
 from nltk.tag.stanford import StanfordPOSTagger
 import missing_words_methods as mwm
 import pandas as pd
-import embedding as emb
+import embedding_helper as emb
 import evaluation as ev
 import warnings
 import random
@@ -22,38 +22,35 @@ import seaborn as sns
 from collections import Counter
 import os
 
-
-java_path = "C:\\Program Files (x86)\\Common Files\\Oracle\\Java\\javapath\\java.exe"
-os.environ['JAVAHOME'] = java_path
-
-st_pos_tagger = StanfordPOSTagger('english-left3words-distsim.tagger', 'C:\\Users\\Rene\\Documents\\stanford-postagger-2018-10-16\\stanford-postagger.jar')
-
 warnings.filterwarnings("ignore")
 sentences = []
 
-stemmer = SnowballStemmer("english")
 punctation = list(string.punctuation)
-stopWords = set(stopwords.words('english'))
+stopWords = stopwords.words('english')
 
 #fastText_emb = FastText.load_fasttext_format('Word Embeddings\\wiki.en.bin', 'utf-8')
 
-#fastText_emb = emb.get_word_embeddings('Word Embeddings\\train_embeddings_wiki_fasttext.txt')
+#fastText_emb_no_char = emb.get_word_embeddings('Word Embeddings\\train_embeddings_wiki_fasttext_more.txt')
+fastText_emb = emb.get_word_embeddings('Word Embeddings\\train_embeddings_wiki_fasttext_word.txt')
 #google_wv = emb.get_word_embeddings('Word Embeddings\\GoogleNews-vectors-negative300.txt')
 google_wv = emb.get_word_embeddings('Word Embeddings\\train_embeddings_googleNews_word2vec.txt')
 #google_wv_g = emb.get_word_embeddings('Word Embeddings\\GoogleNews-vectors-negative300.txt')
-#glove_wv = emb.get_word_embeddings('Word Embeddings\\train_embeddings_wiki_glove.txt')
+#glove_wv = emb.get_word_embeddings('Word Embeddings\\train_embeddings_wiki_glove_official.txt')
 
 #------------------------------
-#google_vw_edit_distance = emb.load_words_distance_dict('string_distance_mapping\\train_edit_distance_word2vec.txt')
-#google_vw_jaccard_distance = emb.load_words_distance_dict('string_distance_mapping\\train_jaccard_distance_word2vec.txt')
-
-google_vw_edit_distance_all_words = emb.load_words_distance_dict('string_distance_mapping\\all_words_train_edit_distance_word2vec.txt')
+google_vw_edit_distance = emb.load_words_distance_dict('string_distance_mapping\\all_words_train_edit_distance_word2vec.txt')
+google_vw_jac_distance = emb.load_words_distance_dict('string_distance_mapping\\train_jaccard_distance_word2vec.txt')
+#fasttext_vw_edit_distance = emb.load_words_distance_dict('string_distance_mapping\\test_train_edit_distance_fasttext.txt')
+#fasttext_vw_jac_distance = emb.load_words_distance_dict('string_distance_mapping\\test_train_jaccard_distance_fasttext.txt')
+#glove_wv_edit_distance = emb.load_words_distance_dict('string_distance_mapping\\test_train_edit_distance_glove_official.txt')
+#glove_wv_jac_distance = emb.load_words_distance_dict('string_distance_mapping\\test_train_jaccard_distance_glove_official.txt')
 
 emb_of_choice=google_wv
-dist_of_choice= google_vw_edit_distance_all_words
+edit_dist_of_choice= google_vw_edit_distance
+jac_dist_of_choice = google_vw_jac_distance
+
 dev_data =pd.read_csv(
     filepath_or_buffer='stsbenchmark\\sts-train.csv',
-#    filepath_or_buffer='./test.csv',
     quoting=csv.QUOTE_NONE,
     sep='\t',
     encoding='utf8',
@@ -77,82 +74,6 @@ def missing_words_per_sentence(sentence, emb):
         if word not in emb:
             missing_words.append(word)
     return len(missing_words)
-
-def synonyme_vec(word, pos, emb):
-    syn_vec=[]
-    alt_syn_vec=[]
-    synset_pos=''
-    if 'N' in pos:
-        synset_pos=wordnet.NOUN
-    elif 'V' in pos:
-        synset_pos=wordnet.VERB
-    elif 'J' in pos:
-        synset_pos=wordnet.ADJ
-    synset_list = wordnet.synsets(word)
-
-    for syn_list in synset_list:
-        if syn_list.pos() == synset_pos:
-            [syn_vec.append(emb[syn]) for syn in syn_list.lemma_names() if syn in emb]
-        else:
-            [alt_syn_vec.append(emb[syn]) for syn in syn_list.lemma_names() if syn in emb]
-    if len(syn_vec) > 1:
-        return syn_vec[0]
-    elif len(alt_syn_vec) > 1:
-        return np.mean(alt_syn_vec, axis=0) 
-    else:
-        return np.zeros(300, dtype="float32")
-
-def get_random_percentage_lists(vec_list_A, vec_list_B, size):
-    if not vec_list_A or not vec_list_B:
-        return [], []
-    list_A_shuffle = vec_list_A.copy()
-    random.shuffle(list_A_shuffle)
-
-    list_B_shuffle = vec_list_B.copy()
-    random.shuffle(list_B_shuffle)
-
-    # liste mit listen, um später mit all_lists[0] auf list_A_shuffle zuzugreifen und mit all_lists[1] auf list_B_shuffle
-    all_lists = [list_A_shuffle, list_B_shuffle]
-
-    # 0.0 - 1.0
-    random_percent = size
-
-    # anzahl aller elemente von list_A_new und list_B_new zusammen (bsp 20% bzw 0.2 -> len(list_A) + len(list_B) = 10; 10*0.2 -> 2; also 2 Elemente)
-    len_lists_total = int((len(vec_list_A) + len(vec_list_B)) * random_percent)
-
-    # liste mit listen, um später mit all_lists_new[0] auf list_A_new zuzugreifen und mit all_lists_new[1] auf list_B_new
-    all_lists_new = [[], []]
-
-    # für die anazahl aller Elemente, die wir hinzufügen:
-    for _ in range(len_lists_total):
-        # entweder 0 oder 1 -> all_lists[0] = list_A_shuffle und all_lists_new[0] = list_A_new
-        random_list_index = random.getrandbits(1)
-        # entweder list_A_shuffle oder list_B_shuffle
-        random_list = all_lists[random_list_index]
-        # wenn die liste leer ist, wir also alle elemente schon in die neue liste gepackt haben, die andere liste benutzen
-        if len(random_list) == 0:
-        # toggle index: 1 wird 0, 0 wird 1
-            random_list_index = 1 - random_list_index
-        # also wird die andere liste gewählt
-            random_list = all_lists[random_list_index]
-        # letztes element entfernen, wegen shuffle ist es ein zufälliger wert
-        random_value = random_list.pop()
-        # das entfernte element in neue liste packen. Wegen selben index kommen werte aus list_A_shuffle in list_A_new und werte aus list_B_shuffle in list_B_new
-        all_lists_new[random_list_index].append(random_value + (True,))
-
-    list_A_new, list_B_new = all_lists_new
-    
-    if not list_A_new:
-        list_A_new.append(all_lists[0].pop() + (True,))
-    if not list_B_new:
-        list_B_new.append(all_lists[1].pop() + (True,))
-    
-    while(len(list_A_new) != len(vec_list_A)):
-        list_A_new.append(all_lists[0].pop() + (False,))
-    while(len(list_B_new) != len(vec_list_B)):
-        list_B_new.append(all_lists[1].pop() + (False,))
-    return list_A_new, list_B_new
-
 
 dev_data[['sentence_1', 'sentence_2']]=dev_data.apply(
     lambda row: pd.Series([preprocess_pipeline(row['sentence_1']),preprocess_pipeline(row['sentence_2'])]), axis=1)
@@ -187,7 +108,7 @@ def sentence_similarity(emb,sentence_1,sentence_2):
     return np.dot(matutils.unitvec(np.array(v1).mean(axis=0), norm='l2'), matutils.unitvec(np.array(v2).mean(axis=0), norm='l2')), len(v1)/len(sentence_1), len(v2)/len(sentence_2)
 
 
-def emb_vector_collection(sentence, emb, pos_filter=None):
+def emb_vector_collection(sentence, emb, pos_filter=None, missing_word_strat=None, edit_distance_dic=None, jaccard_distance_dic=None):
     count_pos=0
     count_use=0
     sentence_vec=[]
@@ -199,38 +120,35 @@ def emb_vector_collection(sentence, emb, pos_filter=None):
             if word in emb and use:
                 if pos_filter not in pos:
                     sentence_vec.append(emb[word])
+                    count_use+=1
                 if pos_filter in pos:
-#                    sentence_vec.append(np.zeros(300, dtype="float32"))
+                    sentence_vec.append(mwm.select_missing_word_strat(word=word,emb=emb,
+                strat=missing_word_strat, pos=pos, edit_distance_dic=edit_distance_dic, jaccard_distance_dic=jaccard_distance_dic))
                     count_pos+=1
             else:
                 missing_token.append(word)
     else:
         for word, pos, use in sentence:
-            if word in emb and use:
+            if use and word in emb:
                 sentence_vec.append(emb[word])
                 count_pos+=1
                 count_use+=1
             if use and word not in emb:
-                #sentence_vec.append(mwm.close_distance_word(word=word,distance_dic=dist_of_choice ,embeddings=emb))
-                count_use+=1
-                sentence_vec.append(synonyme_vec(word=word,pos=pos,emb=emb))
-                #sentence_vec.append(np.zeros(300, dtype="float32"))
+                sentence_vec.append(mwm.select_missing_word_strat(word=word,emb=emb,
+                strat=missing_word_strat, pos=pos, edit_distance_dic=edit_distance_dic, jaccard_distance_dic=jaccard_distance_dic))
+                #count_use+=1
             if not use:
-#                sentence_vec.append(mwm.close_distance_word(word=word,distance_dic=dist_of_choice ,embeddings=emb))
- #               sentence_vec.append(np.zeros(300, dtype="float32"))
-               sentence_vec.append(synonyme_vec(word=word,pos=pos,emb=emb))
- #               missing_token.append(word)
- #               count_use+=1
-#                sentence_vec.append(synonyme_vec(word=word,pos=pos,emb=emb))
+               sentence_vec.append(mwm.select_missing_word_strat(word=word,emb=emb,
+                strat=missing_word_strat, pos=pos, edit_distance_dic=edit_distance_dic, jaccard_distance_dic=jaccard_distance_dic))
                 #sentence_vec.append(np.mean(sentence_emp_vec,axis=0))
 
     return count_pos,sentence_vec, missing_token, count_use
 
 
-def rnd_sentence_similarity(emb,sentence_1,sentence_2, size, percent_mode=False, pos_filter=None):
-    new_sent1, new_sent2 = get_random_percentage_lists(sentence_1, sentence_2, size)
-    count_filter_pos_s1, v2, _, s2_use_count = emb_vector_collection(new_sent2, emb, pos_filter)
-    count_filter_pos_s2, v1, _,s1_use_count = emb_vector_collection(new_sent1, emb, pos_filter)
+def rnd_sentence_similarity(emb,sentence_1,sentence_2, size, percent_mode=False, pos_filter=None, method='0-vector', edit_distance_dic=None, jaccard_distance_dic=None):
+    new_sent1, new_sent2 = ev.get_random_percentage_lists(sentence_1, sentence_2, size)
+    count_filter_pos_s1, v2, _, s2_use_count = emb_vector_collection(new_sent2, emb, pos_filter, missing_word_strat=method, edit_distance_dic=edit_distance_dic,jaccard_distance_dic=jaccard_distance_dic)
+    count_filter_pos_s2, v1, _,s1_use_count = emb_vector_collection(new_sent1, emb, pos_filter, missing_word_strat=method, edit_distance_dic=edit_distance_dic,jaccard_distance_dic=jaccard_distance_dic)
     
     try:
         similiarity_score = np.dot(matutils.unitvec(np.mean(v1,axis=0), norm='l2'), matutils.unitvec(np.mean(v2,axis=0), norm='l2'))
@@ -283,68 +201,99 @@ noun_list=['NN','NNS','NNP','NNPS']
 verb_list=['VB','VBD','VBG','VBN','VBP','VBZ']
 adj_list=['JJ', 'JJR','JJS']
 
-test_pos_list= ['NN', 'VB', 'JJ','CD']
+def pos_filter_similarity(data_frame,emb,pos_filter, methods, edit_distance_dic=None, jaccard_distance_dic=None):
+    pos_list=[]
+    pearson_score=[]
+    spearman_score=[]
+    method_list=[]
+    for method in methods:
+        for pos in pos_filter:
+            data_frame[['pred_value', 'cov_avrg_s1', 'cov_avrg_s2', 'pos_cov_avr_s1', 'pos_cov_avr_s2']]=data_frame.apply(
+            lambda row: pd.Series(
+                rnd_sentence_similarity(emb ,row['sentence_1'],row['sentence_2'], 1, pos_filter=pos, percent_mode=True, method=method, edit_distance_dic=edit_distance_dic, jaccard_distance_dic=jaccard_distance_dic)), axis=1)
+            
+            p_correlation, _ = pearsonr(data_frame['pred_value'].tolist(), data_frame['gold_value'].tolist())
+            s_correlation, _ = spearmanr(data_frame['pred_value'].tolist(), data_frame['gold_value'].tolist())
+            method_list.append(method)
+            pearson_score.append(round(p_correlation*100,2))
+            spearman_score.append(round(s_correlation*100,2))
+            pos_list.append(pos)
 
-#print(fmri)
-def pos_filter_similarity(data_frame,emb,pos_list):
-    for pos in pos_list:
-        data_frame[['pred_value', 'cov_avrg_s1', 'cov_avrg_s2', 'pos_cov_avr_s1', 'pos_cov_avr_s2']]=data_frame.apply(
-        lambda row: pd.Series(
-            rnd_sentence_similarity(emb ,row['sentence_1'],row['sentence_2'], 1, pos_filter=pos, percent_mode=True)), axis=1)
-        
-        p_correlation, _ = pearsonr(data_frame['pred_value'].tolist(), data_frame['gold_value'].tolist())
-        
-        avrg_cov = np.mean(data_frame[['cov_avrg_s1','cov_avrg_s2']].values)
-        avrg_pos_cov = np.mean(data_frame[['pos_cov_avr_s1','pos_cov_avr_s2']].values)
-        
-        print(pos+' --------------------' )
-        print('Pearson - Correlation: '+ str(p_correlation*100))
-        print('Avr_Coverage: '+str(avrg_cov))
-        print('POS_Coverage: ' + str(avrg_pos_cov))
-    return 
+            avrg_cov = np.mean(data_frame[['cov_avrg_s1','cov_avrg_s2']].values)
+            avrg_pos_cov = np.mean(data_frame[['pos_cov_avr_s1','pos_cov_avr_s2']].values)
+            
+            print(pos+' --------------------'+ ': ' + method )
+            print('Pearson - Correlation: '+ str(round(p_correlation*100,2)))
+            print('Spearman - Correlation: '+ str(round(s_correlation*100,2)))
+            print('Avr_Coverage: '+str(avrg_cov))
+            print('POS_Coverage: ' + str(avrg_pos_cov))
+    df = pd.DataFrame({'Pearson_Score': pearson_score, 'Spearman_Score': spearman_score, 'POS':pos_list, 'Methods': method_list})
+    f = sns.barplot(x='POS', y='Pearson_Score',data=df, hue='Methods')
+    plt.show()
+    f = sns.barplot(x='POS', y='Spearman_Score',data=df, hue='Methods')
+    print(df)
+    plt.show()
     
-def missing_words_similarity(data_frame,emb):
+def missing_words_similarity(data_frame,emb, edit_distance_dic=None, jaccard_distance_dic=None ,methods=['0-vector']):
     missing_sentence_count=set((data_frame['missing_emb'].tolist()))
+    method_list =[]
+    sentence_count = []
     aktual_miss=[]
     pearson_score=[]
-    for word_miss in missing_sentence_count:
-        miss_data = data_frame.query('missing_emb =='+str(word_miss))
-        miss_data[['pred_value', 'cov_avrg_s1', 'cov_avrg_s2']]=miss_data.apply(
-            lambda row: pd.Series(rnd_sentence_similarity(emb,row['sentence_1'],row['sentence_2'], 1, percent_mode=True)), axis=1)
-        p_correlation, p_value = pearsonr(miss_data['pred_value'].tolist(), miss_data['gold_value'].tolist())
-        avrg_cov = np.mean(miss_data[['cov_avrg_s1','cov_avrg_s2']].values)
-        if len(miss_data.index) > 1:
-            pearson_score.append(p_correlation*100)
-            aktual_miss.append(word_miss)
-        print('--------------- ' + str(word_miss))
-        print('Pearson - Correlation: '+ str(p_correlation*100))
-        print('Sentence Count: '+ str(len(miss_data.index)))
-        print('Avr_Coverage: '+ str(avrg_cov))
-    df = pd.DataFrame({'Pearson_Score': pearson_score, 'Missing_Words':aktual_miss})
-    sns.pointplot(y='Pearson_Score', x='Missing_Words', data=df).set_title('word2vec')
+    spearman_score=[]
+    for method in methods:
+        for word_miss in missing_sentence_count:
+            miss_data = data_frame.query('missing_emb =='+str(word_miss))
+            miss_data[['pred_value', 'cov_avrg_s1', 'cov_avrg_s2']]=miss_data.apply(
+                lambda row: pd.Series(rnd_sentence_similarity(emb,row['sentence_1'],row['sentence_2'], 1, percent_mode=True,method=method, edit_distance_dic=edit_distance_dic, jaccard_distance_dic=jaccard_distance_dic)), axis=1)
+            p_correlation, p_value = pearsonr(miss_data['pred_value'].tolist(), miss_data['gold_value'].tolist())
+            s_correlation , s_value = spearmanr(miss_data['pred_value'].tolist(), miss_data['gold_value'].tolist())
+            avrg_cov = np.mean(miss_data[['cov_avrg_s1','cov_avrg_s2']].values)
+            if len(miss_data.index) > 100:
+                sentence_count.append(len(miss_data.index))
+                method_list.append(method)
+                pearson_score.append(round(p_correlation*100,2))
+                spearman_score.append(round(s_correlation*100,2))
+                aktual_miss.append(word_miss)
+            print('--------------- ' + str(word_miss)+ ': ' + str(method))
+            print('Pearson - Correlation: '+ str(p_correlation*100))
+            print('Spearman - Correlation: '+ str(s_correlation*100))
+            print('Sentence Count: '+ str(len(miss_data.index)))
+            print('Avr_Coverage: '+ str(avrg_cov))
+    df = pd.DataFrame({'Pearson_Score': pearson_score, 'Spearman_Score': spearman_score, 'Missing_Words':aktual_miss, 'Method': method_list, 'Sentence_Count': sentence_count})
+    print(df)
+    g = sns.factorplot(x="Missing_Words", y="Pearson_Score", hue='Method', data=df)
+    g = sns.factorplot(x="Missing_Words", y="Spearman_Score", hue='Method', data=df)
+    plt.show()
+    f = sns.barplot(x='Missing_Words', y='Sentence_Count',data=df)
     plt.show()
 
 
+def evaluation_emb(embeddings, data_frame):
+    embedding_list=["fasttext","word2vec", "glove"]
+    s_cor = []
+    p_cor =[]
+    word_cov = []
+    for emb in embeddings:
+        data_frame[['pred_value', 'cov_avrg_s1', 'cov_avrg_s2']]=data_frame.apply(
+        lambda row: pd.Series(rnd_sentence_similarity(
+            emb,row['sentence_1'],row['sentence_2'], size=1, percent_mode=True)), axis=1)
+        p_correlation, _ = pearsonr(data_frame['pred_value'].tolist(), data_frame['gold_value'].tolist())
+        s_correlation, _ = spearmanr(data_frame['pred_value'].tolist(), data_frame['gold_value'].tolist())
+        word_cov.append(round(np.mean(data_frame[['cov_avrg_s1','cov_avrg_s2']].values)*100,1))
+        p_cor.append(round(p_correlation*100,1))
+        s_cor.append(round(s_correlation*100,1))
 
 
-# dev_data[['pred_value', 'cov_avrg_s1', 'cov_avrg_s2']]=dev_data.apply(lambda row: pd.Series(rnd_sentence_similarity(emb_of_choice,row['sentence_1'],row['sentence_2'], 1, percent_mode=True)), axis=1)
-
-# p_correlation, p_value = pearsonr(dev_data['pred_value'].tolist(), dev_data['gold_value'].tolist())
-# print(p_correlation)
-
-#ax = sns.regplot(dev_data['pred_value'],dev_data['gold_value'], scatter_kws={"color": "black", 'alpha':0.2}, line_kws={"color": "red"})
-#ax.set(ylim=(-0.5, 5.5))
-#plt.show()
-# avrg_cov = np.mean(dev_data[['cov_avrg_s1','cov_avrg_s2']].values)
-
-#avrg_pos_cov_s1 = sum(dev_data['pos_cov_avr_s1'].tolist())/len(dev_data['pos_cov_avr_s1'].tolist())
-#avrg_pos_cov_s2 = sum(dev_data['pos_cov_avr_s2'].tolist())/len(dev_data['pos_cov_avr_s2'].tolist())
-
-# print(avrg_cov)
-#print((avrg_pos_cov_s1 + avrg_pos_cov_s2)/2)
+    df = pd.DataFrame({'pearson': p_cor, 'spearman': s_cor, 'Word Embeddings': embedding_list , 'Wortabdeckung': word_cov})
+    df = df.melt('Word Embeddings', var_name='Korrelation', value_name='Wert')
+    print(df)
+    sns.barplot(x='Word Embeddings', y='Wert', hue='Korrelation', data=df)
+    plt.show()
+    
 
 
-def evaluate_rnd_coverage_emb(emb, data_frame, iterations, percent_mode):
+def evaluate_rnd_coverage_emb(emb, data_frame, iterations, percent_mode, methods=None, edit_distance_dic=None, jaccard_distance_dic=None):
     if percent_mode is True:
         size=1
     else:
@@ -352,46 +301,60 @@ def evaluate_rnd_coverage_emb(emb, data_frame, iterations, percent_mode):
     _, axes = plt.subplots(5, 2)
     axes = axes.flatten()
     result_dict={}
-    for ax in axes:
-        result_list=[]
-        i=0
-        while i < iterations:
-            data_frame[['pred_value', 'cov_avrg_s1', 'cov_avrg_s2']]=data_frame.apply(
-                lambda row: pd.Series(rnd_sentence_similarity(emb,row['sentence_1'],row['sentence_2'], size=size, percent_mode=percent_mode)), axis=1)
-            p_correlation, _ = pearsonr(data_frame['pred_value'].tolist(), data_frame['gold_value'].tolist())
-            result_list.append(round(p_correlation*100,2))
-            i+=1
-        avr_cov = np.mean(data_frame[['cov_avrg_s1','cov_avrg_s2']].values)
-        avr_pearson = np.mean(result_list)
-        min_pearson = np.min(result_list)
-        max_pearson = np.max(result_list)
-        print('--------------- ' + str(size))
-        print('Min: '+str(min_pearson), 'Max: '+ str(max_pearson))
-        print('Avrg: '+ str(avr_pearson))
-        print('Avr_Coverage: '+ str(avr_cov))
+    method_list = [ item for item in methods for _ in range(iterations) ] 
+    for method in methods:
+        for ax in axes:
+            result_list=[]
+            i=0
+            while i < iterations:
+                data_frame[['pred_value', 'cov_avrg_s1', 'cov_avrg_s2']]=data_frame.apply(
+                    lambda row: pd.Series(rnd_sentence_similarity(
+                        emb,row['sentence_1'],row['sentence_2'], size=size, percent_mode=percent_mode, method=method, edit_distance_dic=edit_distance_dic, jaccard_distance_dic=jaccard_distance_dic)), axis=1)
+                p_correlation, _ = pearsonr(data_frame['pred_value'].tolist(), data_frame['gold_value'].tolist())
+                result_list.append(round(p_correlation*100,2))
+                i+=1
+            avr_cov = np.mean(data_frame[['cov_avrg_s1','cov_avrg_s2']].values)
+            avr_pearson = np.mean(result_list)
+            min_pearson = np.min(result_list)
+            max_pearson = np.max(result_list)
+            print('--------------- ' + str(size)+ ': '+ method)
+            print('Min: '+str(min_pearson), 'Max: '+ str(max_pearson))
+            print('Avrg: '+ str(avr_pearson))
+            print('Avr_Coverage: '+ str(avr_cov))
 
-        result_dict[round(size*100,0)]= result_list
-        try:
-            ax.set_title(str(round(avr_cov*100,0)))
-            sns.distplot(
-                result_list,norm_hist=True,ax=ax,label=size)
-            
+            if round(size*100,0) in result_dict:
+                result_dict[round(size*100,0)] = result_dict[round(size*100,0)] + result_list
+            else:
+                result_dict[round(size*100,0)]=result_list
 
-        except np.linalg.linalg.LinAlgError:
-             print(result_list) 
-        if percent_mode is True:
-            size=round(size-0.1,1)
-        else:
-            size+=1
-    plt.show()
+            try:
+                if len(result_list) > 1:
+                    ax.set_title(str(round(avr_cov*100,0)))
+                    sns.distplot(result_list,norm_hist=True,ax=ax,label=size)
+            except np.linalg.linalg.LinAlgError:
+                print(result_list) 
+            if percent_mode is True:
+                size=round(size-0.1,1)
+            else:
+                size+=1
+        plt.show()
+        size=1
+    result_dict['method'] = method_list
     df = pd.DataFrame.from_dict(result_dict)
+    df = df.melt('method', var_name='Coverage in %', value_name='p_correlation')
     print(df.head())
-    fig = sns.catplot(data=df, kind="violin", estimator=np.mean)
-    sns.catplot(data=df, kind="point", ax=fig.ax, color="black")
-    fig.set_xlabels('coverage-percent')
-    fig.set_ylabels('p-correlation')
-    fig.set(ylim=(0, 80))
-    fig.ax.set_title('word2vec')
+
+    #fig = sns.catplot(x='percent', y='p_correlation', hue='method', data=df, kind="box", estimator=np.mean)
+    #fig = sns.catplot(x='percent', y='p_correlation', hue='method' ,data=df, kind="point")
+    #ax = sns.boxplot(x='Coverage in %', y='p_correlation', hue='method', data=df, dodge=False)
+    ax = sns.pointplot(x='Coverage in %', y='p_correlation', hue='method', data=df)
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles[:len(methods)], labels[:len(methods)]).set_title('Missing Words Methods')
+    #fig.set_xlabels('coverage-percent')
+    #fig.set_ylabels('p-correlation')
+    #fig.set(ylim=(0, 80))
+    #fig.ax.set_title('word2vec')
+    plt.gca().invert_xaxis()
     plt.show()
     return None
 
@@ -406,8 +369,16 @@ print(test_df.tail())
 pos_percent =get_pos_distribution(sentences)
 _, sent_percent = get_sentence_size_distribution(sentences)
 
-evaluate_rnd_coverage_emb(emb_of_choice, dev_data, 100, percent_mode=True)
+methods=["0-vector","hypernym","random","synonym","edit_distance", "jaccard_distance"]
 
-#pos_filter_similarity(emb=fastText_emb, data_frame=dev_data,pos_list=test_pos_list)
+evaluate_rnd_coverage_emb(emb_of_choice, dev_data, 10, percent_mode=True, methods=methods,edit_distance_dic=edit_dist_of_choice, jaccard_distance_dic=jac_dist_of_choice)
 
-#missing_words_similarity(emb=emb_of_choice,data_frame=dev_data)
+
+test_pos_list= ['NN', 'VB', 'JJ','CD']
+
+pos_filter_similarity(emb=emb_of_choice, data_frame=dev_data,pos_filter=test_pos_list, methods=methods, edit_distance_dic=edit_dist_of_choice, jaccard_distance_dic=jac_dist_of_choice)
+
+missing_words_similarity(emb=emb_of_choice,data_frame=dev_data, edit_distance_dic=edit_dist_of_choice, jaccard_distance_dic=jac_dist_of_choice, methods=methods)
+#emb_list = [fastText_emb,google_wv,glove_wv]
+
+#evaluation_emb(emb_list, dev_data)
