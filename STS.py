@@ -31,23 +31,25 @@ stopWords = stopwords.words('english')
 #fastText_emb = FastText.load_fasttext_format('Word Embeddings\\wiki.en.bin', 'utf-8')
 
 #fastText_emb_no_char = emb.get_word_embeddings('Word Embeddings\\train_embeddings_wiki_fasttext_more.txt')
-fastText_emb = emb.get_word_embeddings('Word Embeddings\\train_embeddings_wiki_fasttext_word.txt')
-#google_wv = emb.get_word_embeddings('Word Embeddings\\GoogleNews-vectors-negative300.txt')
-google_wv = emb.get_word_embeddings('Word Embeddings\\train_embeddings_googleNews_word2vec.txt')
-#google_wv_g = emb.get_word_embeddings('Word Embeddings\\GoogleNews-vectors-negative300.txt')
+#fastText_emb = emb.get_word_embeddings('Word Embeddings\\train_embeddings_wiki_fasttext_word.txt')
+#fastText_emb_g = emb.get_word_embeddings('Word Embeddings\\fasttext_wiki.en.txt')
+
+word2vec_wv = emb.get_word_embeddings('Word Embeddings\\train_embeddings_googleNews_word2vec.txt')
+#word2vec_wv_g = emb.get_word_embeddings('Word Embeddings\\GoogleNews-vectors-negative300.txt')
+
 #glove_wv = emb.get_word_embeddings('Word Embeddings\\train_embeddings_wiki_glove_official.txt')
-
+#glove_wv_g = emb.get_word_embeddings('Word Embeddings\\glove.6B.300d.txt')
 #------------------------------
-google_vw_edit_distance = emb.load_words_distance_dict('string_distance_mapping\\all_words_train_edit_distance_word2vec.txt')
-google_vw_jac_distance = emb.load_words_distance_dict('string_distance_mapping\\train_jaccard_distance_word2vec.txt')
-#fasttext_vw_edit_distance = emb.load_words_distance_dict('string_distance_mapping\\test_train_edit_distance_fasttext.txt')
-#fasttext_vw_jac_distance = emb.load_words_distance_dict('string_distance_mapping\\test_train_jaccard_distance_fasttext.txt')
-#glove_wv_edit_distance = emb.load_words_distance_dict('string_distance_mapping\\test_train_edit_distance_glove_official.txt')
-#glove_wv_jac_distance = emb.load_words_distance_dict('string_distance_mapping\\test_train_jaccard_distance_glove_official.txt')
+word2vec_vw_edit_distance = emb.load_words_distance_dict('string_distance_mapping\\train_edit_distance_word2vec.txt')
+word2vec_vw_jac_distance = emb.load_words_distance_dict('string_distance_mapping\\train_jaccard_distance_word2vec.txt')
+#fasttext_vw_edit_distance = emb.load_words_distance_dict('string_distance_mapping\\train_edit_distance_fasttext.txt')
+#fasttext_vw_jac_distance = emb.load_words_distance_dict('string_distance_mapping\\train_jaccard_distance_fasttext.txt')
+#glove_wv_edit_distance = emb.load_words_distance_dict('string_distance_mapping\\train_edit_distance_glove_official.txt')
+#glove_wv_jac_distance = emb.load_words_distance_dict('string_distance_mapping\\train_jaccard_distance_glove_official.txt')
 
-emb_of_choice=google_wv
-edit_dist_of_choice= google_vw_edit_distance
-jac_dist_of_choice = google_vw_jac_distance
+emb_of_choice=word2vec_wv
+edit_dist_of_choice= word2vec_vw_edit_distance
+jac_dist_of_choice = word2vec_vw_jac_distance
 
 dev_data =pd.read_csv(
     filepath_or_buffer='stsbenchmark\\sts-train.csv',
@@ -374,11 +376,11 @@ methods=["0-vector","hypernym","random","synonym","edit_distance", "jaccard_dist
 evaluate_rnd_coverage_emb(emb_of_choice, dev_data, 10, percent_mode=True, methods=methods,edit_distance_dic=edit_dist_of_choice, jaccard_distance_dic=jac_dist_of_choice)
 
 
-test_pos_list= ['NN', 'VB', 'JJ','CD']
+test_pos_list= ['NN', 'VB', 'JJ']
 
 pos_filter_similarity(emb=emb_of_choice, data_frame=dev_data,pos_filter=test_pos_list, methods=methods, edit_distance_dic=edit_dist_of_choice, jaccard_distance_dic=jac_dist_of_choice)
 
-missing_words_similarity(emb=emb_of_choice,data_frame=dev_data, edit_distance_dic=edit_dist_of_choice, jaccard_distance_dic=jac_dist_of_choice, methods=methods)
+#missing_words_similarity(emb=emb_of_choice,data_frame=dev_data, edit_distance_dic=edit_dist_of_choice, jaccard_distance_dic=jac_dist_of_choice, methods=methods)
 #emb_list = [fastText_emb,google_wv,glove_wv]
 
 #evaluation_emb(emb_list, dev_data)
