@@ -80,6 +80,16 @@ def synonym_coverage(word_list):
             print(word)
     print(syn_count/len(word_list))
 
+def hypernym_coverage(word_list):
+    hyp_count=0
+    for word in word_list:
+        synset_list = wordnet.synsets(word)
+        for syn_list in synset_list:
+            hyper_list = syn_list.hypernyms()
+            if hyper_list:
+                hyp_count+=1
+                break
+    print(hyp_count/len(word_list))
 def safe_fasttext_txt(fasttext, target_path):
     with open(target_path,'w',encoding='utf-8') as f:
         for word in fasttext.wv.vocab:
@@ -145,5 +155,6 @@ print('load ready')
 #save_relevant_embeddings_fastText(fastT, 'Word Embeddings\\train_embeddings_wiki_glove_official.txt', sentences)
 #safe_fasttext_txt(fastT, 'Word Embeddings\\fasttext_wiki.en.txt')
 #get_missing_words(fastT,u_word_list, 'missing_words_fasttext_train')
-synonym_coverage(u_word_list)
+hypernym_coverage(u_word_list)
+
 
