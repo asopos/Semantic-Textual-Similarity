@@ -1,7 +1,4 @@
 import numpy as np
-from nltk.tag import pos_tag
-from gensim import matutils
-from scipy.stats import pearsonr
 
 def get_word_embeddings(path):
     temp_embeddings={}
@@ -15,7 +12,12 @@ def get_word_embeddings(path):
                     for index, value in enumerate(line[1:]):
                         if value in '1/5':
                             line[index] = 0.5
-                    temp_embeddings[line[0]] = np.asarray(line[1:], dtype=np.float32)
+                        elif value in '.':
+                            line[index] = 0.0
+                    try:
+                        temp_embeddings[line[0]] = np.asarray(line[1:], dtype=np.float32)
+                    except Exception:
+                        continue
     return temp_embeddings 
 
 def load_words_distance_dict(source_path):
