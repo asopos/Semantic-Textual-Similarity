@@ -2,6 +2,7 @@ from nltk.corpus import wordnet
 import numpy as np
 import nltk
 from time import process_time
+import random
 
 def wordnet_vec(word, pos, emb, useHypernyms=False):
     wordnet_vec=[]
@@ -29,7 +30,7 @@ def wordnet_vec(word, pos, emb, useHypernyms=False):
             else:
                 [alt_wordnet_vec.append(emb[hyper.lemmas()[0].name()]) for hyper in hyper_list if hyper.lemmas()[0].name() in emb]
     if len(wordnet_vec) > 1:
-        return wordnet_vec[0]
+         return np.mean(wordnet_vec, axis=0)
     elif len(alt_wordnet_vec) > 1:
         return np.mean(alt_wordnet_vec, axis=0) 
     else:
@@ -49,6 +50,9 @@ def close_distance_word(word, distance_dic, embeddings, pos=None):
 def random_vector():
     return np.random.random(300)
 
+def random_emb(emb):
+    return random.choice(emb.keys())
+    
 
 def select_missing_word_strat(word,emb, strat='0-vector', edit_distance_dic=None, pos=None, jaccard_distance_dic=None):
     if strat == '0-vector':
@@ -58,7 +62,7 @@ def select_missing_word_strat(word,emb, strat='0-vector', edit_distance_dic=None
     elif strat == 'edit_distance':
         return close_distance_word(word, edit_distance_dic, emb)
     elif strat =='random':
-        return random_vector()
+        return random_emb(emb)
     elif strat =='hypernym':
         return wordnet_vec(word, pos, emb, True)
     elif strat =='jaccard_distance':
