@@ -64,6 +64,30 @@ def save_relevant_embeddings_fastText(src_emb, target_path, sen_Token):
                 count+=1
     print(count)
 
+def get_missing_words(emb, word_list, target_path):
+    with open(target_path,'w',encoding='utf-8') as f:
+        for word in word_list:
+            if word not in emb:
+                f.write(word+ "\n")
+
+def synonym_coverage(word_list):
+    syn_count=0
+    for word in word_list:
+        synset_list = wordnet.synsets(word)
+        if synset_list:
+            syn_count+=1
+        if not synset_list:
+            print(word)
+    print(syn_count/len(word_list))
+
+def safe_fasttext_txt(fasttext, target_path):
+    with open(target_path,'w',encoding='utf-8') as f:
+        for word in fasttext.wv.vocab:
+            try:
+                f.write(str(word)+ ' '+" ".join(map(str, fasttext[word])) + "\n")
+            except Exception:
+                print(word)
+
 def unique_words(sentence_list):
     word_list=[]
     for sentence in sentence_list:
@@ -87,7 +111,6 @@ def missing_words_per_sentence(sentence, emb):
     return len(missing_words)
 
 def save_distance_word_mapping(word_list,embeddings, target_path):
-#    distance_words = map(lambda x:(x[0],nltk.edit_distance(x,word)), embeddings)
     print(len(word_list))
     with open(target_path,'w',encoding='utf-8') as f:
         for word in word_list:
@@ -97,10 +120,14 @@ def save_distance_word_mapping(word_list,embeddings, target_path):
 
 
 #dev_emb = get_word_embeddings('Word Embeddings\\GoogleNews-vectors-fast-test.txt')
-google_emb = em.get_word_embeddings('Word Embeddings\\train_embeddings_googleNews_word2vec.txt')
+#fastT = em.get_word_embeddings("Word Embeddings\\fasttext_wiki.en.txt")
+
+#google_emb = em.get_word_embeddings('Word Embeddings\\GoogleNews-vectors-negative300.txt')
+
 #fastText_emb = em.get_word_embeddings('Word Embeddings\\train_embeddings_wiki_fasttext_word.txt')
-#glove_emb = em.get_word_embeddings('Word Embeddings\\train_embeddings_wiki_glove_official.txt')
-#fastT = FastText.load_fasttext_format("Word Embeddings\\fasttext_wiki.en.bin")
+#glove_emb = em.get_word_embeddings('Word Embeddings\\glove.6B.300d.txt')
+
+
 
 def test_embeddings(emb, sentences):
     words_without_embbedings=[]
@@ -114,8 +141,9 @@ sentences =data['sentence_1'].tolist() +  data['sentence_2'].tolist()
 
 u_word_list=unique_words(sentences)
 #print(len(test_embeddings(dev_emb,sentences)),len(test_embeddings(google_emb,sentences)))
+print('load ready')
+#save_relevant_embeddings_fastText(fastT, 'Word Embeddings\\train_embeddings_wiki_glove_official.txt', sentences)
+#safe_fasttext_txt(fastT, 'Word Embeddings\\fasttext_wiki.en.txt')
+#get_missing_words(fastT,u_word_list, 'missing_words_fasttext_train')
+synonym_coverage(u_word_list)
 
-#save_relevant_embeddings(glove_emb, 'Word Embeddings\\train_embeddings_wiki_glove_official.txt', sentences)
-
-
-save_distance_word_mapping(word_list=u_word_list, embeddings=google_emb, target_path='string_distance_mapping\\train_jaccard_distance_word2vec.txt')
