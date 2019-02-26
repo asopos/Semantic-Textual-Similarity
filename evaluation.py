@@ -9,6 +9,7 @@ import sts_methods as sts
 
 warnings.filterwarnings("ignore")
 #------------Word Embeddings
+
 #fastText_emb = emb.get_word_embeddings('Word Embeddings\\all_embeddings_wiki_fasttext.txt')
 fastText_emb_g = emb.get_word_embeddings('Word Embeddings\\fasttext_wiki.en.txt')
 
@@ -17,7 +18,8 @@ fastText_emb_g = emb.get_word_embeddings('Word Embeddings\\fasttext_wiki.en.txt'
 
 #glove_wv = emb.get_word_embeddings('Word Embeddings\\train_embeddings_wiki_glove_official.txt')
 #glove_wv_g = emb.get_word_embeddings('Word Embeddings\\glove.6B.300d.txt')
-#------------------------------
+#-------------Wort Distanzen
+
 #word2vec_vw_edit_distance = emb.load_words_distance_dict('string_distance_mapping\\all_edit_distance_word2vec.txt')
 #word2vec_vw_jac_distance = emb.load_words_distance_dict('string_distance_mapping\\all_jaccard_distance_word2vec.txt')
 fasttext_vw_edit_distance = emb.load_words_distance_dict('string_distance_mapping\\all_edit_distance_fasttext.txt')
@@ -58,7 +60,7 @@ print(sts_data.head())
 
 em.missing_words_similarity(emb=emb_of_choice,data_frame=sts_data, edit_distance_dic=edit_dist_of_choice, jaccard_distance_dic=jac_dist_of_choice, methods=methods)
 
-em.evaluate_rnd_coverage_emb(emb=emb_of_choice, data_frame=sts_data, iterations=10, percent_mode=True, methods=methods,edit_distance_dic=edit_dist_of_choice, jaccard_distance_dic=jac_dist_of_choice,correlationMethod="S")
+em.evaluate_rnd_coverage_emb(emb=emb_of_choice, data_frame=sts_data, iterations=10, percent_mode=True, methods=methods,edit_distance_dic=edit_dist_of_choice, jaccard_distance_dic=jac_dist_of_choice,correlationMethod="P")
 
 em.method_evaluation(emb=emb_of_choice,data_frame=sts_data, edit_distance_dic=edit_dist_of_choice, jaccard_distance_dic=jac_dist_of_choice, methods=methods)
 
