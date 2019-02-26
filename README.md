@@ -38,3 +38,5 @@ Für die correlationMethod steht "S" für Spearman und "P" für Pearson
 pos_filter_similarity(emb=emb_of_choice, data_frame=sts_data, methods=methods, edit_distance_dic=edit_dist_of_choice,
 jaccard_distance_dic=jac_dist_of_choice)
 
+
+Die Datei embeddings_filter.py beinhaltet Methoden zum erstellen des Distanz Mapping und Filter um relevante Word Embedings raus zu filtern. 
