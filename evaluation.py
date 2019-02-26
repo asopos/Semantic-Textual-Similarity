@@ -1,53 +1,65 @@
-import random
+import csv
 
-def get_random_percentage_lists(vec_list_A, vec_list_B, size):
-    if not vec_list_A or not vec_list_B:
-        return [], []
+import warnings
+import pandas as pd
 
-    list_A_shuffle = vec_list_A.copy()
-    random.shuffle(list_A_shuffle)
+import embedding_helper as emb
+import evaluation_methods as em
+import sts_methods as sts
 
-    list_B_shuffle = vec_list_B.copy()
-    random.shuffle(list_B_shuffle)
+warnings.filterwarnings("ignore")
+#------------Word Embeddings
+#fastText_emb = emb.get_word_embeddings('Word Embeddings\\all_embeddings_wiki_fasttext.txt')
+fastText_emb_g = emb.get_word_embeddings('Word Embeddings\\fasttext_wiki.en.txt')
 
-    # liste mit listen, um später mit all_lists[0] auf list_A_shuffle zuzugreifen und mit all_lists[1] auf list_B_shuffle
-    all_lists = [list_A_shuffle, list_B_shuffle]
+#word2vec_wv = emb.get_word_embeddings('Word Embeddings\\all_embeddings_googleNews_word2vec.txt')
+#word2vec_wv_g = emb.get_word_embeddings('Word Embeddings\\GoogleNews-vectors-negative300.txt')
 
-    # 0.0 - 1.0
-    random_percent = size
+#glove_wv = emb.get_word_embeddings('Word Embeddings\\train_embeddings_wiki_glove_official.txt')
+#glove_wv_g = emb.get_word_embeddings('Word Embeddings\\glove.6B.300d.txt')
+#------------------------------
+#word2vec_vw_edit_distance = emb.load_words_distance_dict('string_distance_mapping\\all_edit_distance_word2vec.txt')
+#word2vec_vw_jac_distance = emb.load_words_distance_dict('string_distance_mapping\\all_jaccard_distance_word2vec.txt')
+fasttext_vw_edit_distance = emb.load_words_distance_dict('string_distance_mapping\\all_edit_distance_fasttext.txt')
+fasttext_vw_jac_distance = emb.load_words_distance_dict('string_distance_mapping\\all_jaccard_distance_fasttext.txt')
+#glove_wv_edit_distance = emb.load_words_distance_dict('string_distance_mapping\\all_edit_distance_glove.txt')
+#glove_wv_jac_distance = emb.load_words_distance_dict('string_distance_mapping\\all_jaccard_distance_glove.txt')
 
-    # anzahl aller elemente von list_A_new und list_B_new zusammen (bsp 20% bzw 0.2 -> len(list_A) + len(list_B) = 10; 10*0.2 -> 2; also 2 Elemente)
-    len_lists_total = int((len(vec_list_A) + len(vec_list_B)) * random_percent)
+methods=["Zufallsvektor","Nullvektor","Hyperonym","Synonym","Levenshtein-Distanz","Jaccard-Distanz"]
 
-    # liste mit listen, um später mit all_lists_new[0] auf list_A_new zuzugreifen und mit all_lists_new[1] auf list_B_new
-    all_lists_new = [[], []]
+emb_of_choice=fastText_emb_g
+edit_dist_of_choice= fasttext_vw_edit_distance
+jac_dist_of_choice = fasttext_vw_jac_distance
 
-    # für die anazahl aller Elemente, die wir hinzufügen:
-    for _ in range(len_lists_total):
-        # entweder 0 oder 1 -> all_lists[0] = list_A_shuffle und all_lists_new[0] = list_A_new
-        random_list_index = random.getrandbits(1)
-        # entweder list_A_shuffle oder list_B_shuffle
-        random_list = all_lists[random_list_index]
-        # wenn die liste leer ist, wir also alle elemente schon in die neue liste gepackt haben, die andere liste benutzen
-        if len(random_list) == 0:
-        # toggle index: 1 wird 0, 0 wird 1
-            random_list_index = 1 - random_list_index
-        # also wird die andere liste gewählt
-            random_list = all_lists[random_list_index]
-        # letztes element entfernen, wegen shuffle ist es ein zufälliger wert
-        random_value = random_list.pop()
-        # das entfernte element in neue liste packen. Wegen selben index kommen werte aus list_A_shuffle in list_A_new und werte aus list_B_shuffle in list_B_new
-        all_lists_new[random_list_index].append(random_value + (True,))
+sts_data =pd.read_csv(
+    filepath_or_buffer='stsbenchmark\\sts-all.csv',
+    quoting=csv.QUOTE_NONE,
+    sep='\t',
+    encoding='utf8',
+    header=None,
+    usecols=[4,5,6]
+    )
+sts_data.columns = ['gold_value','sentence_1','sentence_2']
 
-    list_A_new, list_B_new = all_lists_new
-    
-    if not list_A_new:
-        list_A_new.append(all_lists[0].pop() + (True,))
-    if not list_B_new:
-        list_B_new.append(all_lists[1].pop() + (True,))
-    
-    while(len(list_A_new) != len(vec_list_A)):
-        list_A_new.append(all_lists[0].pop() + (False,))
-    while(len(list_B_new) != len(vec_list_B)):
-        list_B_new.append(all_lists[1].pop() + (False,))
-    return list_A_new, list_B_new
+sts_data[['sentence_1', 'sentence_2']]=sts_data.apply(
+    lambda row: pd.Series([sts.preprocess_pipeline(row['sentence_1']),sts.preprocess_pipeline(row['sentence_2'])]), axis=1)
+
+sts_data['missing_emb'] = sts_data.apply(lambda row: sts.missing_words_per_sentence(row['sentence_1']+ row['sentence_2'], emb_of_choice), axis=1)
+
+sts_data[['sentence_len_1', 'sentence_len_2']]=sts_data.apply(
+    lambda row: pd.Series([len(row['sentence_1']),len(row['sentence_2'])]), axis=1)
+
+
+#Keine leeren Sätze nach Stopwordfilter
+sts_data = sts_data[(sts_data['sentence_len_1']>0) & (sts_data['sentence_len_2']>0)]
+
+print(sts_data.head())
+
+
+em.missing_words_similarity(emb=emb_of_choice,data_frame=sts_data, edit_distance_dic=edit_dist_of_choice, jaccard_distance_dic=jac_dist_of_choice, methods=methods)
+
+em.evaluate_rnd_coverage_emb(emb=emb_of_choice, data_frame=sts_data, iterations=10, percent_mode=True, methods=methods,edit_distance_dic=edit_dist_of_choice, jaccard_distance_dic=jac_dist_of_choice,correlationMethod="S")
+
+em.method_evaluation(emb=emb_of_choice,data_frame=sts_data, edit_distance_dic=edit_dist_of_choice, jaccard_distance_dic=jac_dist_of_choice, methods=methods)
+
+em.pos_filter_similarity(emb=emb_of_choice, data_frame=sts_data, methods=methods, edit_distance_dic=edit_dist_of_choice, jaccard_distance_dic=jac_dist_of_choice)

@@ -1,8 +1,10 @@
 from nltk.corpus import wordnet
 import numpy as np
 import nltk
-from time import process_time
 import random
+import embedding_helper as emb
+
+#fastText_emb_char = emb.get_word_embeddings('Word Embeddings\\fasttext_wiki.en.txt')
 
 def wordnet_vec(word, pos, emb, useHypernyms=False):
     wordnet_vec=[]
@@ -40,7 +42,7 @@ def wordnet_vec(word, pos, emb, useHypernyms=False):
 
 def close_distance_word(word, distance_dic, embeddings, pos=None):
     if word in distance_dic:
-        new_word, edit_score = distance_dic[word]
+        new_word, _ = distance_dic[word]
         if new_word in embeddings:
             return embeddings[new_word]
     else:
@@ -50,20 +52,17 @@ def close_distance_word(word, distance_dic, embeddings, pos=None):
 def random_vector():
     return np.random.random(300)
 
-def random_emb(emb):
-    return random.choice(emb.keys())
-    
 
 def select_missing_word_strat(word,emb, strat='0-vector', edit_distance_dic=None, pos=None, jaccard_distance_dic=None):
-    if strat == '0-vector':
+    if strat == 'Nullvektor':
         return np.zeros(300, dtype="float32")
-    elif strat == 'synonym':
+    elif strat == 'Synonym':
         return wordnet_vec(word, pos, emb)
-    elif strat == 'edit_distance':
+    elif strat == 'Levenshtein-Distanz':
         return close_distance_word(word, edit_distance_dic, emb)
-    elif strat =='random':
-        return random_emb(emb)
-    elif strat =='hypernym':
+    elif strat =='Zufallsvektor':
+        return random_vector()
+    elif strat =='Hyperonym':
         return wordnet_vec(word, pos, emb, True)
-    elif strat =='jaccard_distance':
+    elif strat =='Jaccard-Distanz':
         return close_distance_word(word, jaccard_distance_dic, emb)
